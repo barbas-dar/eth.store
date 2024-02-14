@@ -30,6 +30,7 @@ var opts struct {
 	DebugLevel   uint64
 	Version      bool
 	ReceiptsMode int
+	Upload       bool
 }
 
 func main() {
@@ -43,6 +44,7 @@ func main() {
 	flag.Uint64Var(&opts.DebugLevel, "debug", 0, "set debug-level (higher level will increase verbosity)")
 	flag.BoolVar(&opts.Version, "version", false, "print version and exit")
 	flag.IntVar(&opts.ReceiptsMode, "receipts-mode", 0, "mode to use for fetching tx receipts, 0 = eth_getTransactionReceipt, 1 = eth_getBlockReceipts")
+	flag.BoolVar(&opts.Upload, "upload", false, "upload json to BQ")
 	flag.Parse()
 
 	if opts.Version {
