@@ -17,6 +17,7 @@ import (
 	ethstore "github.com/gobitfly/eth.store"
 	"github.com/gobitfly/eth.store/version"
 	"github.com/shopspring/decimal"
+	"github.com/joho/godotenv"
 )
 
 var opts struct {
@@ -205,11 +206,11 @@ func main() {
 			}
 			
 			// Original Printing Code here:
-			daysJson, err := json.MarshalIndent(&result, "", "\t")
+			daysJsonWithMarshalIndent, err := json.MarshalIndent(&result, "", "\t")
 			if err != nil {
 				log.Fatalf("error marshaling ethstore: %v", err)
 			}
-			fmt.Printf("%s\n", daysJson)
+			fmt.Printf("%s\n", daysJsonWithMarshalIndent)
 		}
 	}
 }
@@ -219,9 +220,13 @@ func logEthstoreDay(d *ethstore.Day) {
 }
 
 func uploadToBQ(jsonData string) {
-	projectID := "dar-data-lake"
-	datasetID := "blockchain_ethereum2"
-	tableID := "test"
+	if err := godotenv.Load(); err != nil {
+        fmt.Println("Error loading .env file")
+    }
+
+	projectID := os.Getenv("projectID")
+	datasetID := os.Getenv("datasetID")
+	tableID := os.Getenv("tableID")	
 
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, projectID)
@@ -272,5 +277,4 @@ func uploadToBQ(jsonData string) {
 	}
 
 	fmt.Println("Job completed successfully")
-
 }

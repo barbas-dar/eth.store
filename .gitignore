@@ -1,3 +1,4 @@
 _gitignore
 bin
 .vscode
+.env
