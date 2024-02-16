@@ -46,8 +46,12 @@ func main() {
 	flag.Uint64Var(&opts.DebugLevel, "debug", 0, "set debug-level (higher level will increase verbosity)")
 	flag.BoolVar(&opts.Version, "version", false, "print version and exit")
 	flag.IntVar(&opts.ReceiptsMode, "receipts-mode", 0, "mode to use for fetching tx receipts, 0 = eth_getTransactionReceipt, 1 = eth_getBlockReceipts")
-	flag.BoolVar(&opts.Upload, "upload", false, "upload json to BQ")
+	flag.BoolVar(&opts.Upload, "upload", false, "upload json to Big Query")
 	flag.Parse()
+
+	if opts.Upload && !opts.Json {
+		log.Fatalf("invalid flag combination, upload flag must be accompanied by a json flag")
+	}
 
 	if opts.Version {
 		fmt.Println(version.Version)
