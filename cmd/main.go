@@ -194,16 +194,17 @@ func main() {
 					log.Fatalf("error marshaling ethstore: %v", err)
 				}
 				daysJson = append(daysJson, jsonItem...)
+
+				// Creates new line delimited JSON by '\n'
+				daysJson = append(daysJson, '\n')
 			}
 			bqFormattedJsonString := string(daysJson)
 
 			if opts.Upload {
 				uploadToBQ(string(bqFormattedJsonString))
 			}
-
-			// FIND A WAY TO CONCAT THE STRINGS
 			
-			// Original Code here:
+			// Original Printing Code here:
 			daysJson, err := json.MarshalIndent(&result, "", "\t")
 			if err != nil {
 				log.Fatalf("error marshaling ethstore: %v", err)
@@ -221,7 +222,6 @@ func uploadToBQ(jsonData string) {
 	projectID := "dar-data-lake"
 	datasetID := "blockchain_ethereum2"
 	tableID := "test"
-	// tempJsonData := `{"day":"1003","dayTime":"2020-12-02T12:00:23Z","apr":"0.179092080939544","validators":"21786","startEpoch":"225","effectiveBalanceGwei":"697152000000000","startBalanceGwei":"697605887541204","endBalanceGwei":"697979954397125","depositsSumGwei":"32000000000","withdrawalsSumGwei":"0","consensusRewardsGwei":"342066855921","txFeesSumWei":"0","totalRewardsWei":"342066855921000000000"}`
 
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, projectID)
