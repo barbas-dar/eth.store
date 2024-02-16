@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/bigquery"
 	"context"
 	"encoding/json"
 	"errors"
@@ -185,6 +186,24 @@ func main() {
 			}
 		}
 		if opts.Json {
+			// Turn into a new line delimitted JSON
+			var daysJson []byte
+			for _, item := range result {
+				jsonItem, err := json.Marshal(item)
+				if err != nil {
+					log.Fatalf("error marshaling ethstore: %v", err)
+				}
+				daysJson = append(daysJson, jsonItem...)
+			}
+			bqFormattedJsonString := string(daysJson)
+
+			if opts.Upload {
+				uploadToBQ(string(bqFormattedJsonString))
+			}
+
+			// FIND A WAY TO CONCAT THE STRINGS
+			
+			// Original Code here:
 			daysJson, err := json.MarshalIndent(&result, "", "\t")
 			if err != nil {
 				log.Fatalf("error marshaling ethstore: %v", err)
@@ -196,4 +215,62 @@ func main() {
 
 func logEthstoreDay(d *ethstore.Day) {
 	fmt.Printf("day: %v (%v), epochs: %v-%v, validators: %v, apr: %v, effectiveBalanceSumGwei: %v, totalRewardsSumWei: %v, consensusRewardsGwei: %v (%s%%), txFeesSumWei: %v\n", d.Day, d.DayTime, d.StartEpoch, d.StartEpoch.Add(decimal.New(224, 0)), d.Validators, d.Apr.StringFixed(9), d.EffectiveBalanceGwei, d.TotalRewardsWei, d.ConsensusRewardsGwei, d.ConsensusRewardsGwei.Mul(decimal.NewFromInt(1e9*1e2)).Div(d.TotalRewardsWei).StringFixed(2), d.TxFeesSumWei)
+}
+
+func uploadToBQ(jsonData string) {
+	projectID := "dar-data-lake"
+	datasetID := "blockchain_ethereum2"
+	tableID := "test"
+	// tempJsonData := `{"day":"1003","dayTime":"2020-12-02T12:00:23Z","apr":"0.179092080939544","validators":"21786","startEpoch":"225","effectiveBalanceGwei":"697152000000000","startBalanceGwei":"697605887541204","endBalanceGwei":"697979954397125","depositsSumGwei":"32000000000","withdrawalsSumGwei":"0","consensusRewardsGwei":"342066855921","txFeesSumWei":"0","totalRewardsWei":"342066855921000000000"}`
+
+	ctx := context.Background()
+	client, err := bigquery.NewClient(ctx, projectID)
+
+	if err != nil {
+		log.Fatalf("Failed to create BigQuery client: %v", err)
+	}
+
+	defer client.Close()
+
+	reader := strings.NewReader(jsonData)
+	source := bigquery.NewReaderSource(reader)
+	source.SourceFormat = bigquery.JSON
+
+	source.Schema = bigquery.Schema{
+		{Name: "day", Type: bigquery.IntegerFieldType},
+		{Name: "dayTime", Type: bigquery.TimestampFieldType},
+		{Name: "apr", Type: bigquery.FloatFieldType},
+		{Name: "validators", Type: bigquery.IntegerFieldType},
+		{Name: "startEpoch", Type: bigquery.IntegerFieldType},
+		{Name: "effectiveBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "startBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "endBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "depositsSumGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "withdrawalsSumGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "consensusRewardsGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "txFeesSumWei", Type: bigquery.BigNumericFieldType},
+		{Name: "totalRewardsWei", Type: bigquery.FloatFieldType},
+	}
+
+	fmt.Println(source)
+	loader := client.Dataset(datasetID).Table(tableID).LoaderFrom(source)
+
+	job, err := loader.Run(ctx)
+
+	if err != nil {
+		log.Fatalf("Failed to run load job: %v", err)
+	}
+
+	status, err := job.Wait(ctx)
+
+	if err != nil {
+		log.Fatalf("Failed to wait for job: %v", err)
+	}
+
+	if err := status.Err(); err != nil {
+		log.Fatalf("Job failed: %v", err)
+	}
+
+	fmt.Println("Job completed successfully")
+
 }
