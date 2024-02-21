@@ -307,7 +307,7 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 	}
 	finalizedSlot := uint64(finalizedHeader.Data.Header.Message.Slot)
 	finalizedDay := finalizedSlot/slotsPerDay - 1
-
+	
 	var day uint64
 	if dayStr == "finalized" {
 		day = finalizedDay
@@ -324,8 +324,14 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 		return nil, nil, fmt.Errorf("requested to calculate eth.store for a future day (last finalized day: %v, requested day: %v)", finalizedDay, day)
 	}
 
-	firstSlot := day * slotsPerDay
-	endSlot := (day + 1) * slotsPerDay // first slot not included in this eth.store-day
+	var firstSlot uint64
+	if day == 0 {
+		firstSlot = 0
+	} else {
+		firstSlot = (day * slotsPerDay) - 3601
+	}
+	
+	endSlot := ((day + 1) * slotsPerDay) - 3601 // first slot not included in this eth.store-day
 
 	if endSlot > finalizedSlot {
 		endSlot = finalizedSlot
