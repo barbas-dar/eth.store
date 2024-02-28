@@ -16,8 +16,8 @@ import (
 
 	ethstore "github.com/gobitfly/eth.store"
 	"github.com/gobitfly/eth.store/version"
-	"github.com/shopspring/decimal"
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 )
 
 var opts struct {
@@ -33,6 +33,7 @@ var opts struct {
 	Version      bool
 	ReceiptsMode int
 	Upload       bool
+	Final        bool
 }
 
 func main() {
@@ -47,6 +48,7 @@ func main() {
 	flag.BoolVar(&opts.Version, "version", false, "print version and exit")
 	flag.IntVar(&opts.ReceiptsMode, "receipts-mode", 0, "mode to use for fetching tx receipts, 0 = eth_getTransactionReceipt, 1 = eth_getBlockReceipts")
 	flag.BoolVar(&opts.Upload, "upload", false, "upload json to Big Query")
+	flag.BoolVar(&opts.Final, "final.day", false, "final day")
 	flag.Parse()
 
 	if opts.Upload && !opts.Json {
@@ -180,14 +182,25 @@ func main() {
 		}
 	} else {
 		result := []*ethstore.Day{}
-		for _, dd := range days {
-			d, _, err := ethstore.Calculate(context.Background(), opts.ConsAddress, opts.ExecAddress, fmt.Sprintf("%d", dd), 10, opts.ReceiptsMode)
+		if opts.Final {
+			d, _, err := ethstore.Calculate(context.Background(), opts.ConsAddress, opts.ExecAddress, "finalized", 10, opts.ReceiptsMode)
 			if err != nil {
 				log.Fatalf("error calculating ethstore: %v", err)
 			}
 			result = append(result, d)
 			if !opts.Json {
 				logEthstoreDay(d)
+			}
+		} else {
+			for _, dd := range days {
+				d, _, err := ethstore.Calculate(context.Background(), opts.ConsAddress, opts.ExecAddress, fmt.Sprintf("%d", dd), 10, opts.ReceiptsMode)
+				if err != nil {
+					log.Fatalf("error calculating ethstore: %v", err)
+				}
+				result = append(result, d)
+				if !opts.Json {
+					logEthstoreDay(d)
+				}
 			}
 		}
 		if opts.Json {
@@ -208,7 +221,7 @@ func main() {
 			if opts.Upload {
 				uploadToBQ(string(bqFormattedJsonString))
 			}
-			
+
 			// Original Printing Code here:
 			daysJsonWithMarshalIndent, err := json.MarshalIndent(&result, "", "\t")
 			if err != nil {
@@ -225,15 +238,15 @@ func logEthstoreDay(d *ethstore.Day) {
 
 func uploadToBQ(jsonData string) {
 	if err := godotenv.Load(); err != nil {
-        fmt.Println("Error loading .env file")
-    }
-	
+		fmt.Println("Error loading .env file")
+	}
+
 	// Print new line delimited json in case of error
 	fmt.Println(jsonData)
 
 	projectID := os.Getenv("projectID")
 	datasetID := os.Getenv("datasetID")
-	tableID := os.Getenv("tableID")	
+	tableID := os.Getenv("tableID")
 
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, projectID)
