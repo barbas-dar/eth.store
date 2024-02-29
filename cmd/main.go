@@ -248,68 +248,65 @@ func upload(jsonData string) {
 	fmt.Println(jsonData)
 
 	projectID := os.Getenv("projectID")
-	//datasetID := os.Getenv("datasetID")
-	//tableID := os.Getenv("tableID")
+	datasetID := os.Getenv("datasetID")
+	tableID := os.Getenv("tableID")
 
-	//ctx := context.Background()
-	//client, err := bigquery.NewClient(ctx, projectID)
-	//
-	//if err != nil {
-	//	log.Fatalf("Failed to create BigQuery client: %v", err)
-	//}
-	//
-	//defer client.Close()
-	//
-	//reader := strings.NewReader(jsonData)
-	//source := bigquery.NewReaderSource(reader)
-	//source.SourceFormat = bigquery.JSON
-	//
-	//source.Schema = bigquery.Schema{
-	//	{Name: "day", Type: bigquery.IntegerFieldType},
-	//	{Name: "dayTime", Type: bigquery.TimestampFieldType},
-	//	{Name: "apr", Type: bigquery.FloatFieldType},
-	//	{Name: "validators", Type: bigquery.IntegerFieldType},
-	//	{Name: "startEpoch", Type: bigquery.IntegerFieldType},
-	//	{Name: "effectiveBalanceGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "startBalanceGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "endBalanceGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "depositsSumGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "withdrawalsSumGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "consensusRewardsGwei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "txFeesSumWei", Type: bigquery.BigNumericFieldType},
-	//	{Name: "totalRewardsWei", Type: bigquery.BigNumericFieldType},
-	//}
-	//
-	//fmt.Println(source)
-	//loader := client.Dataset(datasetID).Table(tableID).LoaderFrom(source)
-	//
-	//job, err := loader.Run(ctx)
-	//
-	//if err != nil {
-	//	log.Fatalf("Failed to run load job: %v", err)
-	//}
-	//
-	//status, err := job.Wait(ctx)
-	//
-	//if err != nil {
-	//	log.Fatalf("Failed to wait for job: %v", err)
-	//}
-	//
-	//if err := status.Err(); err != nil {
-	//	log.Fatalf("Job failed: %v", err)
-	//}
+	ctx := context.Background()
+	client, err := bigquery.NewClient(ctx, projectID)
+
+	if err != nil {
+		log.Fatalf("Failed to create BigQuery client: %v", err)
+	}
+
+	defer client.Close()
+
+	reader := strings.NewReader(jsonData)
+	source := bigquery.NewReaderSource(reader)
+	source.SourceFormat = bigquery.JSON
+
+	source.Schema = bigquery.Schema{
+		{Name: "day", Type: bigquery.IntegerFieldType},
+		{Name: "dayTime", Type: bigquery.TimestampFieldType},
+		{Name: "apr", Type: bigquery.FloatFieldType},
+		{Name: "validators", Type: bigquery.IntegerFieldType},
+		{Name: "startEpoch", Type: bigquery.IntegerFieldType},
+		{Name: "effectiveBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "startBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "endBalanceGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "depositsSumGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "withdrawalsSumGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "consensusRewardsGwei", Type: bigquery.BigNumericFieldType},
+		{Name: "txFeesSumWei", Type: bigquery.BigNumericFieldType},
+		{Name: "totalRewardsWei", Type: bigquery.BigNumericFieldType},
+	}
+
+	fmt.Println(source)
+	loader := client.Dataset(datasetID).Table(tableID).LoaderFrom(source)
+
+	job, err := loader.Run(ctx)
+
+	if err != nil {
+		log.Fatalf("Failed to run load job: %v", err)
+	}
+
+	status, err := job.Wait(ctx)
+
+	if err != nil {
+		log.Fatalf("Failed to wait for job: %v", err)
+	}
+
+	if err := status.Err(); err != nil {
+		log.Fatalf("Job failed: %v", err)
+	}
 
 	fmt.Println("Upload to GCP completed successfully")
 	fmt.Println("Writing to CSV...")
 	csv := new(bytes.Buffer)
-	err := query(csv, projectID)
+
+	err = query(csv, projectID)
 	if err != nil {
 		return
 	}
-
-	//w := csv.NewWriter(csv)
-
-	//w.Close
 
 	fmt.Println("Write to CSV completed successfully")
 }
@@ -379,28 +376,11 @@ func query(w io.Writer, projectID string) error {
 
 	gcsUri := fmt.Sprintf("gs://dar-dev-02-eth-data/%s_DAR_ETH.csv", now)
 
-	//destProjectID := os.Getenv("destProjectID")
-	//
-	//if len(destProjectID) == 0 {
-	//	destProjectID = projectID
-	//}
-
 	err = export(destTableId, destDataSetId, destProjectId, gcsUri)
 	if err != nil {
 		return err
 	}
-	//it, err := job.Read(ctx)
-	//for {
-	//	var row []bigquery.Value
-	//	err := it.Next(&row)
-	//	if err == iterator.Done {
-	//		break
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	fmt.Fprintln(w, row)
-	//}
+
 	return nil
 }
 
