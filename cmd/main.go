@@ -40,7 +40,9 @@ var opts struct {
 
 func main() {
 	flag.StringVar(&opts.Days, "days", "", "days to calculate eth.store for, format: \"1-3\" or \"1,4,6\"")
+	flag.StringVar(&opts.ConsAddress, "cons.address", "http://localhost:4000", "address of the conensus-node-api")
 	flag.DurationVar(&opts.ConsTimeout, "cons.timeout", time.Second*120, "timeout duration for the consensus-node-api")
+	flag.StringVar(&opts.ExecAddress, "exec.address", "http://localhost:4000", "address of the execution-node-api")
 	flag.DurationVar(&opts.ExecTimeout, "exec.timeout", time.Second*120, "timeout duration for the execution-node-api")
 	flag.BoolVar(&opts.Json, "json", false, "format output as json")
 	flag.StringVar(&opts.JsonFile, "json.file", "", "path to file to write results into, only missing days will be added")
@@ -50,9 +52,6 @@ func main() {
 	flag.BoolVar(&opts.Upload, "upload", false, "upload json to Big Query and write CSV to GCS")
 	flag.BoolVar(&opts.Final, "final.day", false, "final day")
 	flag.Parse()
-
-	opts.ConsAddress = os.Getenv("consAddress")
-	opts.ExecAddress = os.Getenv("execAddress")
 
 	if opts.Upload && !opts.Json {
 		log.Fatalf("invalid flag combination, upload flag must be accompanied by a json flag")
@@ -186,7 +185,7 @@ func main() {
 	} else {
 		result := []*ethstore.Day{}
 		if opts.Final {
-			d, _, err := ethstore.Calculate(context.Background(), opts.ConsAddress, opts.ExecAddress, "finalized", 10, opts.ReceiptsMode)
+			d, _, err := ethstore.Calculate(context.Background(), opts.ConsAddress, opts.ExecAddress, "head", 10, opts.ReceiptsMode)
 			if err != nil {
 				log.Fatalf("error calculating ethstore: %v", err)
 			}

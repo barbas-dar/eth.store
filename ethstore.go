@@ -187,9 +187,10 @@ func GetValidators(ctx context.Context, client *http.Service, stateID string) (m
 }
 
 type BlockData struct {
+	Version       spec.DataVersion
 	ProposerIndex phase0.ValidatorIndex
 	Transactions  []bellatrix.Transaction
-	BaseFeePerGas [32]byte
+	BaseFeePerGas *big.Int
 	Deposits      []*phase0.Deposit
 	GasUsed       uint64
 	GasLimit      uint64
@@ -199,6 +200,7 @@ type BlockData struct {
 
 func GetBlockData(block *spec.VersionedSignedBeaconBlock) (*BlockData, error) {
 	d := &BlockData{}
+	d.Version = block.Version
 	switch block.Version {
 	case spec.DataVersionPhase0:
 		d.Deposits = block.Phase0.Message.Body.Deposits
@@ -211,7 +213,11 @@ func GetBlockData(block *spec.VersionedSignedBeaconBlock) (*BlockData, error) {
 		d.ProposerIndex = block.Bellatrix.Message.ProposerIndex
 		d.GasUsed = block.Bellatrix.Message.Body.ExecutionPayload.GasUsed
 		d.GasLimit = block.Bellatrix.Message.Body.ExecutionPayload.GasLimit
-		d.BaseFeePerGas = block.Bellatrix.Message.Body.ExecutionPayload.BaseFeePerGas
+		baseFeePerGasBEBytes := make([]byte, len(block.Bellatrix.Message.Body.ExecutionPayload.BaseFeePerGas))
+		for i := 0; i < 32; i++ {
+			baseFeePerGasBEBytes[i] = block.Bellatrix.Message.Body.ExecutionPayload.BaseFeePerGas[32-1-i]
+		}
+		d.BaseFeePerGas = new(big.Int).SetBytes(baseFeePerGasBEBytes)
 		d.BlockNumber = block.Bellatrix.Message.Body.ExecutionPayload.BlockNumber
 		d.Transactions = block.Bellatrix.Message.Body.ExecutionPayload.Transactions
 	case spec.DataVersionCapella:
@@ -219,7 +225,11 @@ func GetBlockData(block *spec.VersionedSignedBeaconBlock) (*BlockData, error) {
 		d.ProposerIndex = block.Capella.Message.ProposerIndex
 		d.GasUsed = block.Capella.Message.Body.ExecutionPayload.GasUsed
 		d.GasLimit = block.Capella.Message.Body.ExecutionPayload.GasLimit
-		d.BaseFeePerGas = block.Capella.Message.Body.ExecutionPayload.BaseFeePerGas
+		baseFeePerGasBEBytes := make([]byte, len(block.Capella.Message.Body.ExecutionPayload.BaseFeePerGas))
+		for i := 0; i < 32; i++ {
+			baseFeePerGasBEBytes[i] = block.Capella.Message.Body.ExecutionPayload.BaseFeePerGas[32-1-i]
+		}
+		d.BaseFeePerGas = new(big.Int).SetBytes(baseFeePerGasBEBytes)
 		d.Withdrawals = block.Capella.Message.Body.ExecutionPayload.Withdrawals
 		d.BlockNumber = block.Capella.Message.Body.ExecutionPayload.BlockNumber
 		d.Transactions = block.Capella.Message.Body.ExecutionPayload.Transactions
@@ -228,7 +238,7 @@ func GetBlockData(block *spec.VersionedSignedBeaconBlock) (*BlockData, error) {
 		d.ProposerIndex = block.Deneb.Message.ProposerIndex
 		d.GasUsed = block.Deneb.Message.Body.ExecutionPayload.GasUsed
 		d.GasLimit = block.Deneb.Message.Body.ExecutionPayload.GasLimit
-		d.BaseFeePerGas = block.Deneb.Message.Body.ExecutionPayload.BaseFeePerGas.Bytes32()
+		d.BaseFeePerGas = block.Deneb.Message.Body.ExecutionPayload.BaseFeePerGas.ToBig()
 		d.Withdrawals = block.Deneb.Message.Body.ExecutionPayload.Withdrawals
 		d.BlockNumber = block.Deneb.Message.Body.ExecutionPayload.BlockNumber
 		d.Transactions = block.Deneb.Message.Body.ExecutionPayload.Transactions
@@ -307,7 +317,7 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 	}
 	finalizedSlot := uint64(finalizedHeader.Data.Header.Message.Slot)
 	finalizedDay := finalizedSlot/slotsPerDay - 1
-	
+
 	var day uint64
 	if dayStr == "finalized" {
 		day = finalizedDay
@@ -320,9 +330,10 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 		}
 	}
 
-	if day > finalizedDay {
-		return nil, nil, fmt.Errorf("requested to calculate eth.store for a future day (last finalized day: %v, requested day: %v)", finalizedDay, day)
-	}
+	//if day > finalizedDay {
+	//	return nil, nil, fmt.Errorf("requested to calcula
+	//	te eth.store for a future day (last finalized day: %v, requested day: %v)", finalizedDay, day)
+	//}
 
 	var firstSlot uint64
 	if day == 0 {
@@ -330,7 +341,7 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 	} else {
 		firstSlot = (day * slotsPerDay) - 3601
 	}
-	
+
 	endSlot := ((day + 1) * slotsPerDay) - 3601 // first slot not included in this eth.store-day
 
 	if endSlot > finalizedSlot {
@@ -406,6 +417,7 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 	// get all deposits and txs of all active validators in the slot interval [startSlot,endSlot)
 	for i := firstSlot; i < endSlot; i++ {
 		i := i
+
 		if GetDebugLevel() > 0 && (endSlot-i)%1000 == 0 {
 			log.Printf("DEBUG eth.store: checking blocks for deposits and txs: %.0f%% (%v of %v-%v)\n", 100*float64(i-firstSlot)/float64(endSlot-firstSlot), i, firstSlot, endSlot)
 		}
@@ -494,13 +506,7 @@ func Calculate(ctx context.Context, bnAddress, elAddress, dayStr string, concurr
 					totalTxFee.Add(totalTxFee, txFee)
 				}
 
-				// base fee per gas is stored little-endian but we need it
-				// big-endian for big.Int.
-				var baseFeePerGasBEBytes [32]byte
-				for i := 0; i < 32; i++ {
-					baseFeePerGasBEBytes[i] = blockData.BaseFeePerGas[32-1-i]
-				}
-				baseFeePerGas := new(big.Int).SetBytes(baseFeePerGasBEBytes[:])
+				baseFeePerGas := blockData.BaseFeePerGas
 				burntFee := new(big.Int).Mul(baseFeePerGas, new(big.Int).SetUint64(blockData.GasUsed))
 
 				totalTxFee.Sub(totalTxFee, burntFee)

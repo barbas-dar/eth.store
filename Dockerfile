@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 golang:1.19-alpine as build
+FROM golang:1.19-alpine as build
 
 WORKDIR /app
 
